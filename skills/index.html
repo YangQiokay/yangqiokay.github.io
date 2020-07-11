@@ -19,7 +19,7 @@
   <script>
     // Current page data
     var mkdocs_page_name = "Skills";
-    var mkdocs_page_input_path = "skills.md";
+    var mkdocs_page_input_path = "Skills.md";
     var mkdocs_page_url = null;
   </script>
   
@@ -48,15 +48,33 @@
 
       <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
                 <ul>
-                    <li class="toctree-l1"><a class="reference internal" href="..">About</a>
+                    <li class="toctree-l1"><a class="reference internal" href="..">Resume</a>
                     </li>
                 </ul>
                 <ul>
-                    <li class="toctree-l1"><a class="reference internal" href="../projects/">Projects</a>
+                    <li class="toctree-l1"><a class="reference internal" href="../Projects/">Projects</a>
                     </li>
                 </ul>
                 <ul class="current">
                     <li class="toctree-l1 current"><a class="reference internal current" href="./">Skills</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#keras">keras</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#setup">Setup</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#data-loading">Data loading</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#data-preprocessing-with-keras">Data preprocessing with Keras</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#building-models-with-the-keras-functional-api">Building models with the Keras Functional API</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#training-models-with-fit">Training models with fit()</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#games">games：</a>
+    </li>
+    </ul>
                     </li>
                 </ul>
       </div>
@@ -91,7 +109,337 @@
           <div role="main">
             <div class="section">
               
-                
+                <h1 id="codes-for-algorithms">codes for algorithms</h1>
+<h3 id="keras">keras</h3>
+<ol>
+<li>参考：<a href="https://keras.io/">https://keras.io/</a></li>
+</ol>
+<h4 id="setup">Setup</h4>
+<pre><code>import numpy as np
+import tensorflow as tf
+from tensorflow import keras
+</code></pre>
+
+<h4 id="data-loading">Data loading</h4>
+<p>Keras models accept three types of inputs:</p>
+<ul>
+<li><strong>NumPy arrays</strong>, just like Scikit-Learn and many other Python-based libraries. This is a good option if your data fits in memory.</li>
+<li><strong><a href="https://www.tensorflow.org/guide/data">TensorFlow <code>Dataset</code> objects</a></strong>. This is a high-performance option that is more suitable for datasets that do not fit in memory and that are streamed from disk or from a distributed filesystem.</li>
+<li><strong>Python generators</strong> that yield batches of data (such as custom subclasses of the <code>keras.utils.Sequence</code> class).</li>
+</ul>
+<p>Keras features a range of utilities to help you turn raw data on disk into a <code>Dataset</code>:</p>
+<ul>
+<li><code>tf.keras.preprocessing.image_dataset_from_directory</code> turns image files sorted into class-specific folders into a labeled dataset of image tensors.</li>
+<li>
+<p><code>tf.keras.preprocessing.text_dataset_from_directory</code> does the same for text files.</p>
+</li>
+<li>
+<p>In addition, the TensorFlow <code>tf.data</code> includes other similar utilities, such as <code>tf.data.experimental.make_csv_dataset</code> to load structured data from CSV files.</p>
+</li>
+</ul>
+<p>Supposed you have image files sorted by class in different folders, like this:</p>
+<pre><code>main_directory/
+...class_a/
+......a_image_1.jpg
+......a_image_2.jpg
+...class_b/
+......b_image_1.jpg
+......b_image_2.jpg
+</code></pre>
+
+<p>Then you can do:</p>
+<pre><code># Create a dataset.
+dataset = keras.preprocessing.image_dataset_from_directory(
+  'path/to/main_directory', batch_size=64, image_size=(200, 200))
+
+# For demonstration, iterate over the batches yielded by the dataset.
+for data, labels in dataset:
+   print(data.shape)  # (64, 200, 200, 3)
+   print(data.dtype)  # float32
+   print(labels.shape)  # (64,)
+   print(labels.dtype)  # int32
+</code></pre>
+
+<p>The label of a sample is the rank of its folder in alphanumeric order. Naturally, this can also be configured explicitly by passing, e.g. <code>class_names=['class_a', 'class_b']</code>, in which cases label <code>0</code> will be <code>class_a</code> and <code>1</code> will be <code>class_b</code>.</p>
+<p><strong>Example: obtaining a labeled dataset from text files on disk</strong></p>
+<p>Likewise for text: if you have <code>.txt</code> documents sorted by class in different folders, you can do:</p>
+<pre><code>dataset = keras.preprocessing.text_dataset_from_directory(
+  'path/to/main_directory', batch_size=64)
+
+# For demonstration, iterate over the batches yielded by the dataset.
+for data, labels in dataset:
+   print(data.shape)  # (64,)
+   print(data.dtype)  # string
+   print(labels.shape)  # (64,)
+   print(labels.dtype)  # int32
+</code></pre>
+
+<h4 id="data-preprocessing-with-keras">Data preprocessing with Keras</h4>
+<p>Using Keras preprocessing layers</p>
+<p>In Keras, you do in-model data preprocessing via <strong>preprocessing layers</strong>. This includes:</p>
+<ul>
+<li>Vectorizing raw strings of text via the <code>TextVectorization</code> layer</li>
+<li>Feature normalization via the <code>Normalization</code> layer</li>
+<li>Image rescaling, cropping, or image data augmentation</li>
+</ul>
+<p><strong>Example: turning strings into sequences of integer word indices</strong></p>
+<pre><code>from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
+
+# Example training data, of dtype `string`.
+training_data = np.array([[&quot;This is the 1st sample.&quot;], [&quot;And here's the 2nd sample.&quot;]])
+
+# Create a TextVectorization layer instance. It can be configured to either
+# return integer token indices, or a dense token representation (e.g. multi-hot
+# or TF-IDF). The text standardization and text splitting algorithms are fully
+# configurable.
+vectorizer = TextVectorization(output_mode=&quot;int&quot;)
+
+# Calling `adapt` on an array or dataset makes the layer generate a vocabulary
+# index for the data, which can then be reused when seeing new data.
+vectorizer.adapt(training_data)
+
+# After calling adapt, the layer is able to encode any n-gram it has seen before
+# in the `adapt()` data. Unknown n-grams are encoded via an &quot;out-of-vocabulary&quot;
+# token.
+integer_data = vectorizer(training_data)
+print(integer_data)
+
+
+tf.Tensor(
+[[4 5 2 9 3]
+ [7 6 2 8 3]], shape=(2, 5), dtype=int64)
+</code></pre>
+
+<p><strong>Example: turning strings into sequences of one-hot encoded bigrams</strong></p>
+<pre><code>from tensorflow.keras.layers.experimental.preprocessing import TextVectorization
+
+# Example training data, of dtype `string`.
+training_data = np.array([[&quot;This is the 1st sample.&quot;], [&quot;And here's the 2nd sample.&quot;]])
+
+# Create a TextVectorization layer instance. It can be configured to either
+# return integer token indices, or a dense token representation (e.g. multi-hot
+# or TF-IDF). The text standardization and text splitting algorithms are fully
+# configurable.
+vectorizer = TextVectorization(output_mode=&quot;binary&quot;, ngrams=2)
+
+# Calling `adapt` on an array or dataset makes the layer generate a vocabulary
+# index for the data, which can then be reused when seeing new data.
+vectorizer.adapt(training_data)
+
+# After calling adapt, the layer is able to encode any n-gram it has seen before
+# in the `adapt()` data. Unknown n-grams are encoded via an &quot;out-of-vocabulary&quot;
+# token.
+integer_data = vectorizer(training_data)
+print(integer_data)
+
+
+tf.Tensor(
+[[0. 1. 1. 1. 1. 0. 1. 1. 1. 0. 0. 0. 0. 0. 0. 1. 1.]
+ [0. 1. 1. 0. 0. 1. 0. 0. 0. 1. 1. 1. 1. 1. 1. 0. 0.]], shape=(2, 17), dtype=float32)
+</code></pre>
+
+<p><strong>Example: normalizing features</strong></p>
+<pre><code>from tensorflow.keras.layers.experimental.preprocessing import Normalization
+
+# Example image data, with values in the [0, 255] range
+training_data = np.random.randint(0, 256, size=(64, 200, 200, 3)).astype(&quot;float32&quot;)
+
+normalizer = Normalization(axis=-1)
+normalizer.adapt(training_data)
+
+normalized_data = normalizer(training_data)
+print(&quot;var: %.4f&quot; % np.var(normalized_data))
+print(&quot;mean: %.4f&quot; % np.mean(normalized_data))
+
+
+var: 1.0000
+mean: 0.0000
+</code></pre>
+
+<p><strong>Example: rescaling &amp; center-cropping images</strong></p>
+<p>Both the <code>Rescaling</code> layer and the <code>CenterCrop</code> layer are stateless, so it isn't necessary to call <code>adapt()</code> in this case.</p>
+<pre><code>from tensorflow.keras.layers.experimental.preprocessing import CenterCrop
+from tensorflow.keras.layers.experimental.preprocessing import Rescaling
+
+# Example image data, with values in the [0, 255] range
+training_data = np.random.randint(0, 256, size=(64, 200, 200, 3)).astype(&quot;float32&quot;)
+
+cropper = CenterCrop(height=150, width=150)
+scaler = Rescaling(scale=1.0 / 255)
+
+output_data = scaler(cropper(training_data))
+print(&quot;shape:&quot;, output_data.shape)
+print(&quot;min:&quot;, np.min(output_data))
+print(&quot;max:&quot;, np.max(output_data))
+
+
+shape: (64, 150, 150, 3)
+min: 0.0
+max: 1.0
+</code></pre>
+
+<h4 id="building-models-with-the-keras-functional-api">Building models with the Keras Functional API</h4>
+<p>For instance, here's a linear projection layer that maps its inputs to a 16-dimensional feature space:</p>
+<pre><code>dense = keras.layers.Dense(units=16)
+</code></pre>
+
+<p>The most common and most powerful way to build Keras models is the Functional API. </p>
+<pre><code># Let's say we expect our inputs to be RGB images of arbitrary size
+inputs = keras.Input(shape=(None, None, 3))
+</code></pre>
+
+<p>After defining your input(s), you chain layer transformations on top of your inputs, until your final output:</p>
+<pre><code>from tensorflow.keras import layers
+
+# Center-crop images to 150x150
+x = CenterCrop(height=150, width=150)(inputs)
+# Rescale images to [0, 1]
+x = Rescaling(scale=1.0 / 255)(x)
+
+# Apply some convolution and pooling layers
+x = layers.Conv2D(filters=32, kernel_size=(3, 3), activation=&quot;relu&quot;)(x)
+x = layers.MaxPooling2D(pool_size=(3, 3))(x)
+x = layers.Conv2D(filters=32, kernel_size=(3, 3), activation=&quot;relu&quot;)(x)
+x = layers.MaxPooling2D(pool_size=(3, 3))(x)
+x = layers.Conv2D(filters=32, kernel_size=(3, 3), activation=&quot;relu&quot;)(x)
+
+# Apply global average pooling to get flat feature vectors
+x = layers.GlobalAveragePooling2D()(x)
+
+# Add a dense classifier on top
+num_classes = 10
+outputs = layers.Dense(num_classes, activation=&quot;softmax&quot;)(x)
+</code></pre>
+
+<p>Once you have defined the directed acyclic graph of layers that turns your input(s) into your outputs, instantiate a <code>Model</code> object:</p>
+<pre><code>model = keras.Model(inputs=inputs, outputs=outputs)
+</code></pre>
+
+<p>This model behaves basically like a bigger layer. You can call it on batches of data, like this:</p>
+<pre><code>data = np.random.randint(0, 256, size=(64, 200, 200, 3)).astype(&quot;float32&quot;)
+processed_data = model(data)
+print(processed_data.shape)
+(64, 10)
+</code></pre>
+
+<p>You can print a summary of how your data gets transformed at each stage of the model. This is useful for debugging.</p>
+<p>Note that the output shape displayed for each layer includes the <strong>batch size</strong>. Here the batch size is None, which indicates our model can process batches of any size.</p>
+<pre><code>model.summary()
+Model: &quot;functional_1&quot;
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+input_1 (InputLayer)         [(None, None, None, 3)]   0         
+_________________________________________________________________
+center_crop_1 (CenterCrop)   (None, 150, 150, 3)       0         
+_________________________________________________________________
+rescaling_1 (Rescaling)      (None, 150, 150, 3)       0         
+_________________________________________________________________
+conv2d (Conv2D)              (None, 148, 148, 32)      896       
+_________________________________________________________________
+max_pooling2d (MaxPooling2D) (None, 49, 49, 32)        0         
+_________________________________________________________________
+conv2d_1 (Conv2D)            (None, 47, 47, 32)        9248      
+_________________________________________________________________
+max_pooling2d_1 (MaxPooling2 (None, 15, 15, 32)        0         
+_________________________________________________________________
+conv2d_2 (Conv2D)            (None, 13, 13, 32)        9248      
+_________________________________________________________________
+global_average_pooling2d (Gl (None, 32)                0         
+_________________________________________________________________
+dense (Dense)                (None, 10)                330       
+=================================================================
+Total params: 19,722
+Trainable params: 19,722
+Non-trainable params: 0
+_________________________________________________________________
+</code></pre>
+
+<p>The Functional API also makes it easy to build models that have <strong>multiple inputs</strong> (for instance, an image <em>and</em> its metadata) or <strong>multiple</strong> <strong>outputs</strong> (for instance, predicting the class of the image <em>and</em> the likelihood that a user will click on it). For a deeper dive into what you can do, see our <a href="https://keras.io/guides/functional_api/">guide to the Functional API</a>.</p>
+<h4 id="training-models-with-fit">Training models with <code>fit()</code></h4>
+<p>Before you can call <code>fit()</code>, you need to specify an optimizer and a loss function (we assume you are already familiar with these concepts). This is the <code>compile()</code> step:</p>
+<pre><code>model.compile(optimizer=keras.optimizers.RMSprop(learning_rate=1e-3),
+              loss=keras.losses.CategoricalCrossentropy())
+</code></pre>
+
+<p>Loss and optimizer can be specified via their string identifiers (in this case their default constructor argument values are used):</p>
+<pre><code>model.compile(optimizer='rmsprop', loss='categorical_crossentropy')
+</code></pre>
+
+<p>Once your model is compiled, you can start "fitting" the model to the data. Here's what fitting a model looks like with NumPy data:</p>
+<pre><code>model.fit(numpy_array_of_samples, numpy_array_of_labels,
+          batch_size=32, epochs=10)
+</code></pre>
+
+<p>Besides the data, you have to specify two key parameters: the <code>batch_size</code> and the number of epochs (iterations on the data). Here our data will get sliced on batches of 32 samples, and the model will iterate 10 times over the data during training.</p>
+<p>Here's what fitting a model looks like with a dataset:</p>
+<pre><code>model.fit(dataset_of_samples_and_labels, epochs=10)
+</code></pre>
+
+<p>Since the data yielded by a dataset is expect to be already batched, you don't need to specify the batch size here.</p>
+<p>Let's look at it in practice with a toy example model that learns to classify MNIST digits:</p>
+<pre><code># Get the data as Numpy arrays
+(x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
+
+# Build a simple model
+inputs = keras.Input(shape=(28, 28))
+x = layers.experimental.preprocessing.Rescaling(1.0 / 255)(inputs)
+x = layers.Flatten()(x)
+x = layers.Dense(128, activation=&quot;relu&quot;)(x)
+x = layers.Dense(128, activation=&quot;relu&quot;)(x)
+outputs = layers.Dense(10, activation=&quot;softmax&quot;)(x)
+model = keras.Model(inputs, outputs)
+model.summary()
+
+# Compile the model
+model.compile(optimizer=&quot;adam&quot;, loss=&quot;sparse_categorical_crossentropy&quot;)
+
+# Train the model for 1 epoch from Numpy data
+batch_size = 64
+print(&quot;Fit on NumPy data&quot;)
+history = model.fit(x_train, y_train, batch_size=batch_size, epochs=1)
+
+# Train the model for 1 epoch using a dataset
+dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train)).batch(batch_size)
+print(&quot;Fit on Dataset&quot;)
+history = model.fit(dataset, epochs=1)
+Model: &quot;functional_3&quot;
+_________________________________________________________________
+Layer (type)                 Output Shape              Param #   
+=================================================================
+input_2 (InputLayer)         [(None, 28, 28)]          0         
+_________________________________________________________________
+rescaling_2 (Rescaling)      (None, 28, 28)            0         
+_________________________________________________________________
+flatten (Flatten)            (None, 784)               0         
+_________________________________________________________________
+dense_1 (Dense)              (None, 128)               100480    
+_________________________________________________________________
+dense_2 (Dense)              (None, 128)               16512     
+_________________________________________________________________
+dense_3 (Dense)              (None, 10)                1290      
+=================================================================
+Total params: 118,282
+Trainable params: 118,282
+Non-trainable params: 0
+_________________________________________________________________
+Fit on NumPy data
+938/938 [==============================] - 1s 1ms/step - loss: 0.2671
+Fit on Dataset
+938/938 [==============================] - 1s 1ms/step - loss: 0.1156
+</code></pre>
+
+<p>The <code>fit()</code> call returns a "history" object which records what happened over the course of training. The <code>history.history</code> dict contains per-epoch timeseries of metrics values (here we have only one metric, the loss, and one epoch, so we only get a single scalar):</p>
+<pre><code>print(history.history)
+{'loss': [0.11557048559188843]}
+</code></pre>
+
+<p>For a detailed overview of how to use <code>fit()</code>, see the <a href="https://keras.io/guides/training_with_built_in_methods/">guide to training &amp; evaluation with the built-in Keras methods</a>.</p>
+<h3 id="games">games：</h3>
+<ol>
+<li>参考：<a href="https://www.zhihu.com/question/36702693">https://www.zhihu.com/question/36702693</a></li>
+<li>输出：？</li>
+</ol>
               
             </div>
           </div>
@@ -100,7 +448,7 @@
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
       
-        <a href="../projects/" class="btn btn-neutral" title="Projects"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+        <a href="../Projects/" class="btn btn-neutral" title="Projects"><span class="icon icon-circle-arrow-left"></span> Previous</a>
       
     </div>
   
@@ -128,7 +476,7 @@
     <span class="rst-current-version" data-toggle="rst-current-version">
       
       
-        <span><a href="../projects/" style="color: #fcfcfc;">&laquo; Previous</a></span>
+        <span><a href="../Projects/" style="color: #fcfcfc;">&laquo; Previous</a></span>
       
       
     </span>
